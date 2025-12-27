@@ -19,7 +19,7 @@ export default function StockChart({ points }: Props) {
     return null;
   }
 
-  const prices = points.map(p => p.close);
+  const prices = points.map(p => Number(p.close));
   const labels = points.map((_, index) =>
   index % 5 === 0 ? `${points.length - index}` : ''
 );

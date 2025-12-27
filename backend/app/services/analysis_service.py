@@ -1,32 +1,52 @@
 from app.services.alpha_vantage_client import get_daily_time_series
 
-async def analyze_stock(ticker: str) -> str:
+async def analyze_stock(ticker: str):
     data = await get_daily_time_series(ticker)
 
-    if "Note" in data:
-        return "Limite de requisições da Alpha Vantage atingido. Tente novamente em alguns instantes."
+    if not data:
+        return {
+            "summary": "Não foi possível obter dados.",
+            "chart": []
+        }
 
-    if "Error Message" in data:
-        return "Erro ao consultar o ativo informado."
+    sorted_items = sorted(data.items())[-30:]
 
-    series = data.get("Time Series (Daily)")
-    if not series:
-        return "Dados indisponíveis no momento."
+    # Build chart robustly: skip entries that don't have the expected
+    # close field and handle parsing errors gracefully.
+    chart = []
+    for date, values in sorted_items:
+        if not isinstance(values, dict):
+            continue
 
-    dates = sorted(series.keys(), reverse=True)
+        # Primary expected key is "4. close" (Alpha Vantage), but be resilient
+        close_str = values.get("4. close")
+        if close_str is None:
+            # Some unexpected response could use a different key or be malformed.
+            continue
 
-    if len(dates) < 2:
-        return "Dados insuficientes para análise."
+        try:
+            close = float(close_str)
+        except (ValueError, TypeError):
+            continue
 
-    latest = series[dates[0]]
-    previous = series[dates[1]]
+        chart.append({"date": date, "close": close})
 
-    close_latest = float(latest["4. close"])
-    close_previous = float(previous["4. close"])
+    if len(chart) < 2:
+        return {
+            "summary": "Dados insuficientes para cálculo (resposta da API inesperada).",
+            "chart": chart,
+        }
 
-    variation = ((close_latest - close_previous) / close_previous) * 100
+    last = chart[-1]["close"]
+    prev = chart[-2]["close"]
+    change = ((last - prev) / prev) * 100
 
-    return (
-        f"Último fechamento: {close_latest:.2f}. "
-        f"Variação diária: {variation:.2f}%."
+    summary = (
+        f"Último fechamento: {last:.2f}. "
+        f"Variação diária: {change:.2f}%."
     )
+
+    return {
+        "summary": summary,
+        "chart": chart
+    }

@@ -6,5 +6,6 @@ router = APIRouter()
 
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(request: AnalyzeRequest):
-    summary = await analyze_stock(request.ticker)
-    return AnalyzeResponse(summary=summary)
+    result = await analyze_stock(request.ticker)
+    return AnalyzeResponse(**result)
+
